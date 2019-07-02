@@ -72,23 +72,25 @@ public class AwsRotatingCredentialsProvider: StoppableCredentialsProvider {
     private var expiringCredentials: ExpiringCredentials
     static let queue = DispatchQueue(label: "com.amazon.SmokeAWSCredentials.AwsRotatingCredentialsProvider")
     
+    enum State {
+        case initialized
+        case scheduled
+        case processing
+        case shuttingDown
+        case shutDown
+    }
+    
     let expirationBufferSeconds = 300.0 // 5 minutes
     let validCredentialsRetrySeconds = 60.0 // 1 minute
     let invalidCredentialsRetrySeconds = 3600.0 // 1 hour
     
-    public enum Status {
-        case initialized
-        case running
-        case shuttingDown
-        case stopped
-    }
-    
-    public var status: Status
     var currentWorker: (() -> ())?
-    let completedSemaphore = DispatchSemaphore(value: 0)
-    var statusMutex: pthread_mutex_t
     let expiringCredentialsRetriever: ExpiringCredentialsRetriever
     let scheduler: AsyncAfterScheduler
+    
+    private var state: State = .initialized
+    private var stateLock: NSLock = NSLock()
+    let shutdownDispatchGroup: DispatchGroup
     
     /**
      Initializer that accepts the initial ExpiringCredentials instance for this provider.
@@ -133,8 +135,8 @@ public class AwsRotatingCredentialsProvider: StoppableCredentialsProvider {
      Schedules credentials rotation to begin.
      */
     public func start(roleSessionName: String?) {
-        guard case .initialized = status else {
-            // if this instance isn't in the initialized state, do nothing
+        guard updateOnStart() else {
+            // nothing to do; already started
             return
         }
         
@@ -150,59 +152,40 @@ public class AwsRotatingCredentialsProvider: StoppableCredentialsProvider {
      Gracefully shuts down credentials rotation, letting any ongoing work complete..
      */
     public func stop() {
-        pthread_mutex_lock(&statusMutex)
-        defer { pthread_mutex_unlock(&statusMutex) }
-        
-        // if there is currently a worker to shutdown
-        switch status {
-        case .initialized:
-            // no worker ever started, can just go straight to stopped
-            status = .stopped
-            expiringCredentialsRetriever.close()
-            completedSemaphore.signal()
-        case .running:
-            status = .shuttingDown
-        default:
-            // nothing to do
-            break
+        if let completionHandlers = updateOnShutdownStart() {
+            return handleCredentialRotationShutdown(completionHandlers: completionHandlers)
         }
-    }
-    
-    private func verifyWorkerNotStopped() -> Bool {
-        pthread_mutex_lock(&statusMutex)
-        defer { pthread_mutex_unlock(&statusMutex) }
-        
-        guard case .stopped = status else {
-            return false
-        }
-        
-        return true
     }
     
     /**
-     Waits for the work to exit.
-     If stop() is not called, this will block forever.
+     Blocks until credential rotation has been shutdown and all completion handlers
+     have been executed.
      */
     public func wait() {
-        guard self.verifyWorkerNotStopped() else {
-            return
+        if !isShutdown() {
+            shutdownDispatchGroup.wait()
         }
-        
-        completedSemaphore.wait()
     }
     
-    private func verifyWorkerNotCancelled() -> Bool {
-        pthread_mutex_lock(&statusMutex)
-        defer { pthread_mutex_unlock(&statusMutex) }
-        
-        guard case .running = status else {
-            status = .stopped
-            expiringCredentialsRetriever.close()
-            completedSemaphore.signal()
-            return false
+    /**
+     Blocks credential rotation has been shutdown and all completion handlers
+     have been executed. The provided closure will be added to the list of
+     completion handlers to be executed on shutdown. If the worker is already
+     shutdown, the provided closure will be immediately executed.
+     
+     - Parameters:
+        - onShutdown: the closure to be executed after the worker has been
+                      fully shutdown.
+     */
+    public func waitUntilShutdownAndThen(onShutdown: @escaping () -> Void) throws {
+        let handlerQueuedForFutureShutdownComplete = addShutdownHandler(onShutdown: onShutdown)
+
+        if handlerQueuedForFutureShutdownComplete {
+            shutdownDispatchGroup.wait()
+        } else {
+            // the worker is already shutdown, immediately call the handler
+            onShutdown()
         }
-        
-        return true
     }
     
     internal func scheduleUpdateCredentials(beforeExpiration expiration: Date,
@@ -282,5 +265,143 @@ public class AwsRotatingCredentialsProvider: StoppableCredentialsProvider {
         
         self.status = .running
         self.currentWorker = newWorker
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    private func handleCredentialRotationShutdown(completionHandlers: [() -> Void]) {
+        Log.verbose("Starting shutdown of credential rotation.")
+        // execute all the completion handlers
+        completionHandlers.forEach { $0() }
+        
+        expiringCredentialsRetriever.close()
+        expiringCredentialsRetriever.wait()
+
+        // release any waiters for shutdown
+        self.shutdownDispatchGroup.leave()
+        
+        Log.verbose("Finished shutdown of credential rotation.")
+    }
+    
+    /**
+     Updates the Lifecycle state on a start request.
+     - Returns: if the start request should be acted upon (and credential rotation started).
+                Will be false if credential rotation is already running, is shutting down or has completed shutting down.
+     */
+    private func updateOnStart() -> Bool {
+        stateLock.lock()
+        defer {
+            stateLock.unlock()
+        }
+
+        if case .initialized = state {
+            state = .processing
+
+            return true
+        }
+
+        return false
+    }
+    
+    /**
+     Updates the Lifecycle state on a shutdown request.
+     - Returns: If the shutdownCompletionHandlers has been shutdown as the result of this call.
+     */
+    private func updateOnShutdownStart() -> Bool {
+        stateLock.lock()
+        defer {
+            stateLock.unlock()
+        }
+
+        let shutdown: Bool
+        switch state {
+        case .processing:
+            state = .shuttingDown
+            wasShutdown = false
+        case .shuttingDown, .shutDown:
+            // nothing to do; already shutting down or shutdown
+            isNowShutdown = false
+        case .initialized, .scheduled:
+            state = .shutDown
+            
+            completionHandlers = shutdownCompletionHandlers
+            shutdownCompletionHandlers = []
+        }
+        
+        return completionHandlers
+    }
+    
+    /**
+     Updates the Lifecycle state to shutdown credential rotation is shutting down
+     - Returns: If the shutdownCompletionHandlers has been shutdown as the result of this call.
+     */
+    private func updateShutdownIfShuttingDown() -> Bool {
+        stateLock.lock()
+        defer {
+            stateLock.unlock()
+        }
+
+        let completionHandlers: [() -> Void]?
+        switch state {
+        case .initialized, .processing, .scheduled:
+            completionHandlers = nil
+        case .shuttingDown, .shutDown:
+            state = .shutDown
+            
+            completionHandlers = shutdownCompletionHandlers
+            shutdownCompletionHandlers = []
+        }
+
+        return completionHandlers
+    }
+    
+    /**
+     Indicates if credential rotation is currently shutdown.
+     - Returns: if credential rotation is currently shutdown.
+     */
+    private func isShutdown() -> Bool {
+        stateLock.lock()
+        defer {
+            stateLock.unlock()
+        }
+
+        if case .shutDown = state {
+            return true
+        }
+
+        return false
+    }
+    
+    private func updateOnScheduledStart() {
+        stateLock.lock()
+        defer {
+            stateLock.unlock()
+        }
+
+        switch state {
+        case .initialized, .shuttingDown, .shutDown, .scheduled:
+            break
+        case .processing:
+            state = .scheduled
+        }
+    }
+    
+    private func updateOnScheduledEnd() {
+        stateLock.lock()
+        defer {
+            stateLock.unlock()
+        }
+
+        switch state {
+        case .initialized, .shuttingDown, .shutDown, .processing:
+            break
+        case .scheduled:
+            state = .processing
+        }
     }
 }
