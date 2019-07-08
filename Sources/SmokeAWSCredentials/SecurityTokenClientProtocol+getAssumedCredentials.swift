@@ -20,7 +20,7 @@ import SecurityTokenClient
 import SecurityTokenModel
 import SmokeAWSCore
 import SmokeHTTPClient
-import LoggerAPI
+import Logging
 
 enum AssumingRoleError: Error {
     case unableToAssumeRole(arn: String, error: Error)
@@ -32,10 +32,12 @@ internal struct AWSSTSExpiringCredentialsRetriever: ExpiringCredentialsRetriever
     let roleArn: String
     let roleSessionName: String
     let durationSeconds: Int?
+    let reporting: HTTPClientInvocationReporting
     
     init(credentialsProvider: CredentialsProvider,
          roleArn: String,
          roleSessionName: String,
+         reporting: HTTPClientInvocationReporting,
          durationSeconds: Int?,
          retryConfiguration: HTTPClientRetryConfiguration,
          eventLoopProvider: HTTPClient.EventLoopProvider) {
@@ -45,6 +47,7 @@ internal struct AWSSTSExpiringCredentialsRetriever: ExpiringCredentialsRetriever
             eventLoopProvider: eventLoopProvider)
         self.roleArn = roleArn
         self.roleSessionName = roleSessionName
+        self.reporting = reporting
         self.durationSeconds = durationSeconds
     }
     
@@ -60,6 +63,7 @@ internal struct AWSSTSExpiringCredentialsRetriever: ExpiringCredentialsRetriever
         return try client.getAssumedExpiringCredentials(
                     roleArn: roleArn,
                     roleSessionName: roleSessionName,
+                    reporting: reporting,
                     durationSeconds: durationSeconds)
     }
 }
@@ -78,6 +82,7 @@ extension SecurityTokenClientProtocol {
      */
     internal func getAssumedExpiringCredentials(roleArn: String,
                                                 roleSessionName: String,
+                                                reporting: HTTPClientInvocationReporting,
                                                 durationSeconds: Int?) throws -> ExpiringCredentials {
         let input = SecurityTokenModel.AssumeRoleRequest(durationSeconds: durationSeconds,
                                                          roleArn: roleArn,
@@ -86,7 +91,7 @@ extension SecurityTokenClientProtocol {
         let output: SecurityTokenModel.AssumeRoleResponseForAssumeRole
         do {
             // call to assume the role
-            output = try assumeRoleSync(input: input)
+            output = try assumeRoleSync(input: input, reporting: reporting)
         } catch {
             throw AssumingRoleError.unableToAssumeRole(arn: roleArn, error: error)
         }
@@ -107,6 +112,7 @@ extension SecurityTokenClientProtocol {
     internal static func getAssumedStaticCredentials(
         roleArn: String,
         roleSessionName: String,
+        reporting: HTTPClientInvocationReporting,
         credentialsProvider: CredentialsProvider,
         retryConfiguration: HTTPClientRetryConfiguration) -> StaticCredentials? {
         let securityTokenClient = AWSSecurityTokenClient(
@@ -121,9 +127,10 @@ extension SecurityTokenClientProtocol {
             delegatedCredentials = try securityTokenClient.getAssumedExpiringCredentials(
                 roleArn: roleArn,
                 roleSessionName: roleSessionName,
+                reporting: reporting,
                 durationSeconds: nil)
         } catch {
-            Log.warning("Unable to assumed delegated rotating credentials: \(error).")
+            reporting.logger.warning("Unable to assumed delegated rotating credentials: \(error).")
     
             return nil
         }
@@ -139,6 +146,7 @@ extension SecurityTokenClientProtocol {
     internal static func getAssumedRotatingCredentials(
         roleArn: String,
         roleSessionName: String,
+        reporting: HTTPClientInvocationReporting,
         credentialsProvider: CredentialsProvider,
         durationSeconds: Int?,
         retryConfiguration: HTTPClientRetryConfiguration,
@@ -147,6 +155,7 @@ extension SecurityTokenClientProtocol {
             credentialsProvider: credentialsProvider,
             roleArn: roleArn,
             roleSessionName: roleSessionName,
+            reporting: reporting,
             durationSeconds: durationSeconds,
             retryConfiguration: retryConfiguration,
             eventLoopProvider: eventLoopProvider)
@@ -154,9 +163,9 @@ extension SecurityTokenClientProtocol {
         let delegatedRotatingCredentials: AwsRotatingCredentialsProvider
         do {
             delegatedRotatingCredentials = try AwsRotatingCredentialsProvider(
-                expiringCredentialsRetriever: credentialsRetriever)
+                expiringCredentialsRetriever: credentialsRetriever, reporting: reporting)
         } catch {
-            Log.warning("Unable to assumed delegated rotating credentials: \(error).")
+            reporting.logger.warning("Unable to assumed delegated rotating credentials: \(error).")
     
             return nil
         }

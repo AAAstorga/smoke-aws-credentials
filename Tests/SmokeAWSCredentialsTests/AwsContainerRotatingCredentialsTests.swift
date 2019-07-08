@@ -85,7 +85,8 @@ class AwsContainerRotatingCredentialsTests: XCTestCase {
         
         let environment = ["AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": "endpoint"]
         let credentialsProvider = AwsContainerRotatingCredentialsProvider.get(fromEnvironment: environment,
-                                                                                 dataRetrieverProvider: dataRetrieverProvider)!
+                                                                              reporting: TestingReporting(),
+                                                                              dataRetrieverProvider: dataRetrieverProvider)!
         let credentials = credentialsProvider.credentials
         
         XCTAssertEqual(TestVariables.accessKeyId, credentials.accessKeyId)
@@ -98,7 +99,8 @@ class AwsContainerRotatingCredentialsTests: XCTestCase {
                            "AWS_SECRET_ACCESS_KEY": TestVariables.secretAccessKey,
                            "AWS_SESSION_TOKEN": TestVariables.sessionToken]
         let credentialsProvider = AwsContainerRotatingCredentialsProvider.get(fromEnvironment: environment,
-                                                                                 dataRetrieverProvider: dataRetrieverProvider1)!
+                                                                              reporting: TestingReporting(),
+                                                                              dataRetrieverProvider: dataRetrieverProvider1)!
         let credentials = credentialsProvider.credentials
         
         XCTAssertEqual(TestVariables.accessKeyId, credentials.accessKeyId)
@@ -108,7 +110,8 @@ class AwsContainerRotatingCredentialsTests: XCTestCase {
  
     func testNoCredentials() {
         let credentialsProvider = AwsContainerRotatingCredentialsProvider.get(fromEnvironment: [:],
-                                                                                 dataRetrieverProvider: dataRetrieverProvider1)
+                                                                              reporting: TestingReporting(),
+                                                                              dataRetrieverProvider: dataRetrieverProvider1)
         
         XCTAssertNil(credentialsProvider)
     }

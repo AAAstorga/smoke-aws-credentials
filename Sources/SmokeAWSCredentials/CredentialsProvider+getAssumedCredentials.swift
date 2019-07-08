@@ -19,7 +19,7 @@ import Foundation
 import SmokeAWSCore
 import SecurityTokenClient
 import SmokeHTTPClient
-import LoggerAPI
+import Logging
 
 public extension SmokeAWSCore.CredentialsProvider {
     
@@ -32,13 +32,15 @@ public extension SmokeAWSCore.CredentialsProvider {
         - retryConfiguration: the client retry configuration to use to get the credentials.
                               If not present, the default configuration will be used.
      */
-    public func getAssumedStaticCredentials(
+    func getAssumedStaticCredentials(
             roleArn: String,
             roleSessionName: String,
+            reporting: HTTPClientInvocationReporting,
             retryConfiguration: HTTPClientRetryConfiguration = .default) -> StaticCredentials? {
         return AWSSecurityTokenClient.getAssumedStaticCredentials(
             roleArn: roleArn,
             roleSessionName: roleSessionName,
+            reporting: reporting,
             credentialsProvider: self,
             retryConfiguration: retryConfiguration)
     }
@@ -55,15 +57,17 @@ public extension SmokeAWSCore.CredentialsProvider {
         - retryConfiguration: the client retry configuration to use to get the credentials.
                               If not present, the default configuration will be used.
      */
-    public func getAssumedRotatingCredentials(
+    func getAssumedRotatingCredentials(
         roleArn: String,
         roleSessionName: String,
+        reporting: HTTPClientInvocationReporting,
         durationSeconds: Int?,
         retryConfiguration: HTTPClientRetryConfiguration = .default,
         eventLoopProvider: HTTPClient.EventLoopProvider = .spawnNewThreads) -> StoppableCredentialsProvider? {
         return AWSSecurityTokenClient.getAssumedRotatingCredentials(
             roleArn: roleArn,
             roleSessionName: roleSessionName,
+            reporting: reporting,
             credentialsProvider: self,
             durationSeconds: durationSeconds,
             retryConfiguration: retryConfiguration,

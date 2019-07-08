@@ -41,7 +41,7 @@ class SmokeAWSCredentialsTests: XCTestCase {
         let expiration = Date(timeIntervalSinceNow: 305)
         let expiryString = expiration.iso8601
         
-        func assumeRoleSync(input: SecurityTokenModel.AssumeRoleRequest) throws -> SecurityTokenModel.AssumeRoleResponseForAssumeRole {
+        func assumeRoleSync(input: SecurityTokenModel.AssumeRoleRequest, reporting: HTTPClientInvocationReporting) throws -> SecurityTokenModel.AssumeRoleResponseForAssumeRole {
             let credentials = SecurityTokenModel.Credentials(accessKeyId: TestVariables.accessKeyId,
                                                              expiration: expiryString,
                                                              secretAccessKey: TestVariables.secretAccessKey,
@@ -62,16 +62,19 @@ class SmokeAWSCredentialsTests: XCTestCase {
         let client: MockSecurityTokenClient
         let roleArn: String
         let roleSessionName: String
+        let reporting: HTTPClientInvocationReporting
         let durationSeconds: Int?
         
         init(assumeRoleSyncOverride: @escaping SecurityTokenClientProtocol.AssumeRoleSyncType,
              roleArn: String,
              roleSessionName: String,
+             reporting: HTTPClientInvocationReporting,
              durationSeconds: Int?,
              retryConfiguration: HTTPClientRetryConfiguration) {
             self.client = MockSecurityTokenClient(assumeRoleSync: assumeRoleSyncOverride)
             self.roleArn = roleArn
             self.roleSessionName = roleSessionName
+            self.reporting = reporting
             self.durationSeconds = durationSeconds
         }
         
@@ -87,6 +90,7 @@ class SmokeAWSCredentialsTests: XCTestCase {
             return try client.getAssumedExpiringCredentials(
                         roleArn: roleArn,
                         roleSessionName: roleSessionName,
+                        reporting: reporting,
                         durationSeconds: durationSeconds)
         }
     }
@@ -96,6 +100,7 @@ class SmokeAWSCredentialsTests: XCTestCase {
             assumeRoleSyncOverride: getAssumeRoleSync(),
             roleArn: "arn:aws:iam::XXXXXXXXXXXX:role/theRole",
             roleSessionName: "mySession",
+            reporting: TestingReporting(),
             durationSeconds: 3600,
             retryConfiguration: .default)
         
@@ -114,6 +119,7 @@ class SmokeAWSCredentialsTests: XCTestCase {
         let credentials = try client.getAssumedExpiringCredentials(
                 roleArn: "arn:aws:iam::XXXXXXXXXXXX:role/theRole",
                 roleSessionName: "mySession",
+                reporting: TestingReporting(),
                 durationSeconds: nil)
         XCTAssertEqual(TestVariables.accessKeyId, credentials.accessKeyId)
         XCTAssertEqual(TestVariables.secretAccessKey, credentials.secretAccessKey)

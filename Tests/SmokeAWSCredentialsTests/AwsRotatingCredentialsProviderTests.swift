@@ -5,6 +5,9 @@
 
 import XCTest
 @testable import SmokeAWSCredentials
+import SmokeHTTPClient
+import Logging
+import Metrics
 
 struct AlwaysValidRetriever: ExpiringCredentialsRetriever {
     func close() {
@@ -63,12 +66,25 @@ class CountingScheduler: AsyncAfterScheduler {
     }
 }
 
+struct TestingReporting: HTTPClientInvocationReporting {
+    let logger: Logger = Logger(label: "test")
+    
+    let successCounter: Counter? = nil
+    
+    let failureCounter: Counter? = nil
+    
+    let retryCountRecorder: Recorder? = nil
+    
+    let durationTimer: Metrics.Timer? = nil
+    
+}
+
 class AwsRotatingCredentialsProviderTests: XCTestCase {
     func testAlwaysSucceedCredentialsRotation() throws {
         let scheduler = CountingScheduler()
         let provider = try AwsRotatingCredentialsProvider(
             expiringCredentialsRetriever: AlwaysValidRetriever(),
-            scheduler: scheduler)
+            scheduler: scheduler, reporting: TestingReporting())
         
         // simulate 100 successful credentials
         for _ in 0..<100 {
@@ -88,7 +104,7 @@ class AwsRotatingCredentialsProviderTests: XCTestCase {
         let retriever = SometimesFailRetriever()
         let provider = try AwsRotatingCredentialsProvider(
             expiringCredentialsRetriever: retriever,
-            scheduler: scheduler)
+            scheduler: scheduler, reporting: TestingReporting())
         
         for _ in 0..<100 {
             let beforeExpiration = Date(timeIntervalSinceNow: 60)
