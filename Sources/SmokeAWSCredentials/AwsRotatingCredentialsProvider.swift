@@ -90,7 +90,7 @@ public class AwsRotatingCredentialsProvider: StoppableCredentialsProvider {
     var statusMutex: pthread_mutex_t
     let expiringCredentialsRetriever: ExpiringCredentialsRetriever
     let scheduler: AsyncAfterScheduler
-    let reporting: HTTPClientInvocationReporting
+    let reporting: SmokeAWSInvocationReporting
     
     /**
      Initializer that accepts the initial ExpiringCredentials instance for this provider.
@@ -99,14 +99,14 @@ public class AwsRotatingCredentialsProvider: StoppableCredentialsProvider {
         - expiringCredentialsRetriever: retriever of expiring credentials.
      */
     public convenience init(expiringCredentialsRetriever: ExpiringCredentialsRetriever,
-                            reporting: HTTPClientInvocationReporting) throws {
+                            reporting: SmokeAWSInvocationReporting) throws {
         try self.init(expiringCredentialsRetriever: expiringCredentialsRetriever,
                       scheduler: AwsRotatingCredentialsProvider.queue, reporting: reporting)
     }
     
     internal init(expiringCredentialsRetriever: ExpiringCredentialsRetriever,
                   scheduler: AsyncAfterScheduler,
-                  reporting: HTTPClientInvocationReporting) throws {
+                  reporting: SmokeAWSInvocationReporting) throws {
         self.expiringCredentials = try expiringCredentialsRetriever.get()
         self.currentWorker = nil
         self.expiringCredentialsRetriever = expiringCredentialsRetriever

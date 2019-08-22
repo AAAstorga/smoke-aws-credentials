@@ -35,7 +35,7 @@ public extension SmokeAWSCore.CredentialsProvider {
     func getAssumedStaticCredentials(
             roleArn: String,
             roleSessionName: String,
-            reporting: HTTPClientInvocationReporting,
+            reporting: SmokeAWSInvocationReporting,
             retryConfiguration: HTTPClientRetryConfiguration = .default) -> StaticCredentials? {
         return AWSSecurityTokenClient.getAssumedStaticCredentials(
             roleArn: roleArn,
@@ -60,7 +60,7 @@ public extension SmokeAWSCore.CredentialsProvider {
     func getAssumedRotatingCredentials(
         roleArn: String,
         roleSessionName: String,
-        reporting: HTTPClientInvocationReporting,
+        reporting: SmokeAWSInvocationReporting,
         durationSeconds: Int?,
         retryConfiguration: HTTPClientRetryConfiguration = .default,
         eventLoopProvider: HTTPClient.EventLoopProvider = .spawnNewThreads) -> StoppableCredentialsProvider? {

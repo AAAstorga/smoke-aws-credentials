@@ -6,6 +6,7 @@
 import XCTest
 @testable import SmokeAWSCredentials
 import SmokeHTTPClient
+import SmokeAWSCore
 import Logging
 import Metrics
 
@@ -66,16 +67,8 @@ class CountingScheduler: AsyncAfterScheduler {
     }
 }
 
-struct TestingReporting: HTTPClientInvocationReporting {
+struct TestingReporting: SmokeAWSInvocationReporting {
     let logger: Logger = Logger(label: "test")
-    
-    let successCounter: Counter? = nil
-    
-    let failureCounter: Counter? = nil
-    
-    let retryCountRecorder: Recorder? = nil
-    
-    let durationTimer: Metrics.Timer? = nil
     
 }
 

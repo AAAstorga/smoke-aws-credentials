@@ -52,7 +52,7 @@ public extension AwsContainerRotatingCredentialsProvider {
      static credentials under the AWS_SECRET_ACCESS_KEY and AWS_ACCESS_KEY_ID keys.
      */
     static func get(fromEnvironment environment: [String: String] = ProcessInfo.processInfo.environment,
-                    reporting: HTTPClientInvocationReporting,
+                    reporting: SmokeAWSInvocationReporting,
                     eventLoopProvider: HTTPClient.EventLoopProvider = .spawnNewThreads)
         -> StoppableCredentialsProvider? {
             let dataRetrieverProvider: (String) -> () throws -> Data = { credentialsPath in
@@ -80,7 +80,7 @@ public extension AwsContainerRotatingCredentialsProvider {
      Internal static function for testing.
      */
     static func get(fromEnvironment environment: [String: String],
-                    reporting: HTTPClientInvocationReporting,
+                    reporting: SmokeAWSInvocationReporting,
                     dataRetrieverProvider: (String) -> () throws -> Data)
         -> StoppableCredentialsProvider? {
             var credentialsProvider: StoppableCredentialsProvider?
@@ -109,7 +109,7 @@ public extension AwsContainerRotatingCredentialsProvider {
     
     private static func getStaticCredentialsProvider(
         fromEnvironment environment: [String: String],
-        reporting: HTTPClientInvocationReporting,
+        reporting: SmokeAWSInvocationReporting,
         dataRetrieverProvider: (String) -> () throws -> Data)
         -> StoppableCredentialsProvider? {
             // get the values of the environment variables
@@ -134,7 +134,7 @@ public extension AwsContainerRotatingCredentialsProvider {
     
 #if DEBUG
     private static func getDevRotatingCredentialsProvider(fromEnvironment environment: [String: String],
-                                                          reporting: HTTPClientInvocationReporting) -> StoppableCredentialsProvider? {
+                                                          reporting: SmokeAWSInvocationReporting) -> StoppableCredentialsProvider? {
         // get the values of the environment variables
         let devCredentialsIamRoleArn = environment["DEV_CREDENTIALS_IAM_ROLE_ARN"]
         
@@ -176,7 +176,7 @@ public extension AwsContainerRotatingCredentialsProvider {
     
     private static func getRotatingCredentialsProvider(
         fromEnvironment environment: [String: String],
-        reporting: HTTPClientInvocationReporting,
+        reporting: SmokeAWSInvocationReporting,
         dataRetrieverProvider: (String) -> () throws -> Data)
         -> StoppableCredentialsProvider? {
         // get the values of the environment variables
@@ -203,7 +203,7 @@ public extension AwsContainerRotatingCredentialsProvider {
     }
     
     private static func createRotatingCredentialsProvider(
-        reporting: HTTPClientInvocationReporting,
+        reporting: SmokeAWSInvocationReporting,
         dataRetriever: @escaping () throws -> Data) throws
         -> StoppableCredentialsProvider {
         let credentialsRetriever = FromDataExpiringCredentialsRetriever(

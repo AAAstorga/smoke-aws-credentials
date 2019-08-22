@@ -41,7 +41,7 @@ class SmokeAWSCredentialsTests: XCTestCase {
         let expiration = Date(timeIntervalSinceNow: 305)
         let expiryString = expiration.iso8601
         
-        func assumeRoleSync(input: SecurityTokenModel.AssumeRoleRequest, reporting: HTTPClientInvocationReporting) throws -> SecurityTokenModel.AssumeRoleResponseForAssumeRole {
+        func assumeRoleSync(input: SecurityTokenModel.AssumeRoleRequest, reporting: SmokeAWSInvocationReporting) throws -> SecurityTokenModel.AssumeRoleResponseForAssumeRole {
             let credentials = SecurityTokenModel.Credentials(accessKeyId: TestVariables.accessKeyId,
                                                              expiration: expiryString,
                                                              secretAccessKey: TestVariables.secretAccessKey,
@@ -62,13 +62,13 @@ class SmokeAWSCredentialsTests: XCTestCase {
         let client: MockSecurityTokenClient
         let roleArn: String
         let roleSessionName: String
-        let reporting: HTTPClientInvocationReporting
+        let reporting: SmokeAWSInvocationReporting
         let durationSeconds: Int?
         
         init(assumeRoleSyncOverride: @escaping SecurityTokenClientProtocol.AssumeRoleSyncType,
              roleArn: String,
              roleSessionName: String,
-             reporting: HTTPClientInvocationReporting,
+             reporting: SmokeAWSInvocationReporting,
              durationSeconds: Int?,
              retryConfiguration: HTTPClientRetryConfiguration) {
             self.client = MockSecurityTokenClient(assumeRoleSync: assumeRoleSyncOverride)

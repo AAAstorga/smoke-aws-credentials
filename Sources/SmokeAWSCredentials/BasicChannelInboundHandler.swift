@@ -20,6 +20,7 @@ import NIO
 import NIOHTTP1
 import Logging
 import SmokeHTTPClient
+import SmokeAWSCore
 import NIOFoundationCompat
 
 enum BasicHttpChannelError: Error {
@@ -40,7 +41,7 @@ final class BasicChannelInboundHandler: ChannelInboundHandler {
     /// The endpoint path to request a response from.
     private let endpointPath: String
     private let endpointHostName: String
-    private let reporting: HTTPClientInvocationReporting
+    private let reporting: SmokeAWSInvocationReporting
     
     /// The http head of the response received
     private var responseHead: HTTPResponseHead?
@@ -48,7 +49,7 @@ final class BasicChannelInboundHandler: ChannelInboundHandler {
     public var partialBody: Data?
     
     init(endpointHostName: String, endpointPath: String,
-         reporting: HTTPClientInvocationReporting) {
+         reporting: SmokeAWSInvocationReporting) {
         self.endpointHostName = endpointHostName
         self.endpointPath = endpointPath
         self.reporting = reporting
@@ -56,7 +57,7 @@ final class BasicChannelInboundHandler: ChannelInboundHandler {
     
     static func call(endpointHostName: String,
                      endpointPath: String,
-                     reporting: HTTPClientInvocationReporting,
+                     reporting: SmokeAWSInvocationReporting,
                      eventLoopProvider: HTTPClient.EventLoopProvider,
                      endpointPort: Int = 80
                      ) throws -> Data? {

@@ -32,12 +32,12 @@ internal struct AWSSTSExpiringCredentialsRetriever: ExpiringCredentialsRetriever
     let roleArn: String
     let roleSessionName: String
     let durationSeconds: Int?
-    let reporting: HTTPClientInvocationReporting
+    let reporting: SmokeAWSInvocationReporting
     
     init(credentialsProvider: CredentialsProvider,
          roleArn: String,
          roleSessionName: String,
-         reporting: HTTPClientInvocationReporting,
+         reporting: SmokeAWSInvocationReporting,
          durationSeconds: Int?,
          retryConfiguration: HTTPClientRetryConfiguration,
          eventLoopProvider: HTTPClient.EventLoopProvider) {
@@ -82,7 +82,7 @@ extension SecurityTokenClientProtocol {
      */
     internal func getAssumedExpiringCredentials(roleArn: String,
                                                 roleSessionName: String,
-                                                reporting: HTTPClientInvocationReporting,
+                                                reporting: SmokeAWSInvocationReporting,
                                                 durationSeconds: Int?) throws -> ExpiringCredentials {
         let input = SecurityTokenModel.AssumeRoleRequest(durationSeconds: durationSeconds,
                                                          roleArn: roleArn,
@@ -112,7 +112,7 @@ extension SecurityTokenClientProtocol {
     internal static func getAssumedStaticCredentials(
         roleArn: String,
         roleSessionName: String,
-        reporting: HTTPClientInvocationReporting,
+        reporting: SmokeAWSInvocationReporting,
         credentialsProvider: CredentialsProvider,
         retryConfiguration: HTTPClientRetryConfiguration) -> StaticCredentials? {
         let securityTokenClient = AWSSecurityTokenClient(
@@ -146,7 +146,7 @@ extension SecurityTokenClientProtocol {
     internal static func getAssumedRotatingCredentials(
         roleArn: String,
         roleSessionName: String,
-        reporting: HTTPClientInvocationReporting,
+        reporting: SmokeAWSInvocationReporting,
         credentialsProvider: CredentialsProvider,
         durationSeconds: Int?,
         retryConfiguration: HTTPClientRetryConfiguration,
