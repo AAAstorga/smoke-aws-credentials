@@ -35,12 +35,16 @@ public extension SmokeAWSCore.CredentialsProvider {
     func getAssumedStaticCredentials(
             roleArn: String,
             roleSessionName: String,
-            reporting: SmokeAWSInvocationReporting,
+            reporting: SmokeAWSInvocationReporting? = nil,
             retryConfiguration: HTTPClientRetryConfiguration = .default) -> StaticCredentials? {
+        let reportingToUse = reporting ?? SmokeAWSCredentialsInvocationReporting.getAssumedRoleDefault(
+            roleArn: roleArn,
+            roleSessionName: roleSessionName)
+        
         return AWSSecurityTokenClient.getAssumedStaticCredentials(
             roleArn: roleArn,
             roleSessionName: roleSessionName,
-            reporting: reporting,
+            reporting: reportingToUse,
             credentialsProvider: self,
             retryConfiguration: retryConfiguration)
     }
@@ -60,14 +64,18 @@ public extension SmokeAWSCore.CredentialsProvider {
     func getAssumedRotatingCredentials(
         roleArn: String,
         roleSessionName: String,
-        reporting: SmokeAWSInvocationReporting,
+        reporting: SmokeAWSInvocationReporting? = nil,
         durationSeconds: Int?,
         retryConfiguration: HTTPClientRetryConfiguration = .default,
         eventLoopProvider: HTTPClient.EventLoopProvider = .spawnNewThreads) -> StoppableCredentialsProvider? {
+        let reportingToUse = reporting ?? SmokeAWSCredentialsInvocationReporting.getAssumedRoleDefault(
+            roleArn: roleArn,
+            roleSessionName: roleSessionName)
+        
         return AWSSecurityTokenClient.getAssumedRotatingCredentials(
             roleArn: roleArn,
             roleSessionName: roleSessionName,
-            reporting: reporting,
+            reporting: reportingToUse,
             credentialsProvider: self,
             durationSeconds: durationSeconds,
             retryConfiguration: retryConfiguration,

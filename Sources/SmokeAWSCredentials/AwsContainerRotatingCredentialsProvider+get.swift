@@ -52,15 +52,17 @@ public extension AwsContainerRotatingCredentialsProvider {
      static credentials under the AWS_SECRET_ACCESS_KEY and AWS_ACCESS_KEY_ID keys.
      */
     static func get(fromEnvironment environment: [String: String] = ProcessInfo.processInfo.environment,
-                    reporting: SmokeAWSInvocationReporting,
+                    reporting: SmokeAWSInvocationReporting? = nil,
                     eventLoopProvider: HTTPClient.EventLoopProvider = .spawnNewThreads)
         -> StoppableCredentialsProvider? {
+            let reportingToUse = reporting ?? SmokeAWSCredentialsInvocationReporting.awsContainerDefault
+            
             let dataRetrieverProvider: (String) -> () throws -> Data = { credentialsPath in
                 return {
                     guard let response = try BasicChannelInboundHandler.call(
                         endpointHostName: credentialsHost,
                         endpointPath: credentialsPath,
-                        reporting: reporting,
+                        reporting: reportingToUse,
                         eventLoopProvider: eventLoopProvider,
                         endpointPort: credentialsPort) else {
                             let reason = "Unable to retrieve credentials: No credentials returned from endpoint"
@@ -72,7 +74,7 @@ public extension AwsContainerRotatingCredentialsProvider {
                 }
             }
             
-            return get(fromEnvironment: environment, reporting: reporting,
+            return get(fromEnvironment: environment, reporting: reportingToUse,
                        dataRetrieverProvider: dataRetrieverProvider)
     }
     
